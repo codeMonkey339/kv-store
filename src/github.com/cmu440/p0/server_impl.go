@@ -2,17 +2,16 @@
 
 package p0
 
-import {
+import (
 	"fmt"
 	"net"
-	"bufio"
-	"bytes"
 	"strconv"
-}
+)
+
 
 type keyValueServer struct {
-	var kvstore KVStore
-	var conns int
+	conns int
+	kvstore KVStore
 }
 
 const (
@@ -24,14 +23,20 @@ const (
 
 
 // New creates and returns (but does not start) a new KeyValueServer.
-func New() KeyValueServer *keyValueServer{
-	kvServer := &{conns: 0, kvstore: make(KVStore)}
+func New() *keyValueServer{
+	kvServer := &keyValueServer{
+		conns: 0,
+		kvstore: KVStore{
+			kvstore: make(map[string][]byte),
+		},
+	}
 	kvServer.kvstore.init_db()
 	return kvServer
 }
 
 func (kvs *keyValueServer) Start(port int) error {
-	l, err = net.Listen(CONN_TYPE, CONN_HOST + ":" + string(port))
+	fmt.Println("Creating socket on port: ", port)
+	l, err := net.Listen(CONN_TYPE, CONN_HOST + ":" + strconv.Itoa(port))
 	if err != nil {
 		/* log network error to stdio*/
 		fmt.Println("Error listening:", err.Error())
@@ -39,15 +44,14 @@ func (kvs *keyValueServer) Start(port int) error {
 	}
 	/* when existing from this function, close the port */
 	defer l.Close()
-	fmt.Println("Listening on " + CONN_HOST  + ":" + string(port))
+	fmt.Println("Listening on " + CONN_HOST  + ":" + strconv.Itoa(port))
 	for { // Listen for an incoming connection
-		conn, err = l.Accept()
+		conn, err := l.Accept()
 		if err != nil {
 			fmt.Println("Error accepting: ", err.Error())
-			/* does this keyword exist ?*/
+			/* Go has the continue keyword */
 			continue
 		}
-		// Handle the new connection in a new goroutine
 		go handleRequest(conn)
 	}
 	return nil
@@ -73,6 +77,7 @@ func handleRequest(conn net.Conn) {
 		fmt.Println("Error reading:", err.Error())
 		return
 	}
-
+	fmt.Println(conn)
+	fmt.Println("Reading len: ", reqLen)
 	/* todo: need to parse request and send back response */
 }

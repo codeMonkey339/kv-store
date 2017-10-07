@@ -13,25 +13,25 @@ Presence of interface: to enable polymorphism
 
 type KVStore struct{
 	/* can struct fields be initialized in definition */
-	var kvstore map[string][]byte
+	kvstore map[string][]byte
 }
 
 
 // this function instantiates the database
 func (kvstore *KVStore) init_db() {
 	/* []byte is a byte array which is type as well*/
-	kvstore = make(map[string][]byte)
+	kvstore.kvstore = make(map[string][]byte)
 }
 
 // put inserts a new key value pair or updates the value for a
 // given key in the store
 func (kvstore *KVStore) put(key string, value []byte) {
 	/* kvstore is a pointer, can it be used in this way? yes*/
-	kvstore[key] = value
+	kvstore.kvstore[key] = value
 }
 
 // get fetches the value associated with the key
 func (kvstore *KVStore) get(key string) []byte {
-	v, _ := kvstore[key]
+	v, _ := kvstore.kvstore[key]
 	return v
 }
