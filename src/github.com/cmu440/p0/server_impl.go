@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 )
 
 
@@ -26,9 +27,6 @@ const (
 func New() *keyValueServer{
 	kvServer := &keyValueServer{
 		conns: 0,
-		kvstore: KVStore{
-			kvstore: make(map[string][]byte),
-		},
 	}
 	kvServer.kvstore.init_db()
 	return kvServer
@@ -66,10 +64,16 @@ func (kvs *keyValueServer) Count() int {
 	return -1
 }
 
-// TODO: add additional methods/functions below!
+/*
+The server should not assume that the key-value API function listed are thread-safe.
+You will be responsible for ensuring that there are no race conditions while accessing the database?
 
-/* this function will handle newly accepted connections in a go */
-/* routine */
+How to guard critical region with goroutine? If this knows, then problem solved
+
+All synchronization must be done using goroutines, channels and Go's channel-based select statement
+
+The server must implement a Count() function that returns the # of connected clients
+*/
 func handleRequest(conn net.Conn) {
 	buf := make([]byte, BUFFER_SIZE)
 	reqLen, err := conn.Read(buf)
@@ -80,4 +84,37 @@ func handleRequest(conn net.Conn) {
 	fmt.Println(conn)
 	fmt.Println("Reading len: ", reqLen)
 	/* todo: need to parse request and send back response */
+	tokens:= strings.Split(string(buf[:]), ",")
+	switch strings.ToLower(strings.TrimRight(tokens[0], " ")){
+	case "get": doGet()
+	case "put": doPut()
+	default:
+	}
+}
+
+/*
+work horse for the GET request
+
+GET request format:
+put, key, value
+
+response format of GET:
+key, value
+
+*/
+func doGet(){
+
+}
+
+/*
+work horse for the PUT request
+
+PUT request format:
+get, key
+
+No reponse should be sent to any of the clients for a put request
+
+*/
+func doPut(){
+
 }
