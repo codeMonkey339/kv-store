@@ -11,7 +11,9 @@ import (
 
 
 type keyValueServer struct {
+	/* the # of connections */
 	conns int
+	/* the kv store to actually store data */
 	kvstore KVStore
 }
 
@@ -22,8 +24,7 @@ const (
 )
 
 
-
-// New creates and returns (but does not start) a new KeyValueServer.
+// create and initialize a new kv server
 func New() *keyValueServer{
 	kvServer := &keyValueServer{
 		conns: 0,
@@ -32,6 +33,7 @@ func New() *keyValueServer{
 	return kvServer
 }
 
+// method on the keyValueServer to start the server with the given port #
 func (kvs *keyValueServer) Start(port int) error {
 	fmt.Println("Creating socket on port: ", port)
 	l, err := net.Listen(CONN_TYPE, CONN_HOST + ":" + strconv.Itoa(port))
@@ -54,6 +56,7 @@ func (kvs *keyValueServer) Start(port int) error {
 	}
 	return nil
 }
+
 
 func (kvs *keyValueServer) Close() {
 	// TODO: release the kv store; how to terminate all goroutines?

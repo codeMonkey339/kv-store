@@ -4,7 +4,7 @@ package p0
 
 /*
 Go doesn't have the concept of class, use struct instead
-accee modifier: there is public/private/protected keyword. use*/
+access modifier: there is public/private/protected keyword. use*/
 /*small/big initials: if the first letter is big case, it is exported*/
 /*otherwise it is only package access
 
