@@ -44,7 +44,7 @@ array type or slice type;
 	new(Thing) works for Thing of any type
  */
 func New() *keyValueServer{
-	fmt.Println("Allocating a new keyValueServer")
+	//fmt.Println("Allocating a new keyValueServer")
 	kvServer := new (keyValueServer)
 	kvServer.kvstore.init_db()
 	kvServer.conns_num = 0
@@ -58,54 +58,57 @@ func New() *keyValueServer{
 // method on the keyValueServer to start the server with the given port #
 /* able to use instance symbols with kvs */
 func (kvs *keyValueServer) Start(port int) error {
-	fmt.Println("Creating socket on port: ", port)
+	//fmt.Println("Creating socket on port: ", port)
 	l, _:= net.Listen(CONN_TYPE, CONN_HOST + ":" + strconv.Itoa(port))
-	fmt.Println("Listening on " + CONN_HOST  + ":" + strconv.Itoa(port))
+	//fmt.Println("Listening on " + CONN_HOST  + ":" + strconv.Itoa(port))
 	go handleKvsAccess(kvs.dataChan, kvs)
-	//todo: here is not allowed to be blocking
-	for { // Listen for an incoming connection
-		conn, _ := l.Accept()
-		kvs.conns = append(kvs.conns, conn)
-		newChan := make(chan string, BUFFER_LEN)
-		kvs.conns_chans = append(kvs.conns_chans, newChan)
-		// inline function for goroutines
-		go func(new_chan chan string, conn net.Conn){
-			fmt.Fprintf(conn, <- new_chan)
-		}(newChan, conn)
-		kvs.conns_num++
-		fmt.Printf("Connected to socket %d\n", conn)
-		fmt.Printf("In total there are %d connections\n", kvs.conns_num)
-		go handleRequest(conn, kvs)
-	}
+	// the loop needs running in a routine to make this func non-blocking
+	go func(l net.Listener){
+		for { // Listen for an incoming connection
+			conn, _ := l.Accept()
+			kvs.conns = append(kvs.conns, conn)
+			newChan := make(chan string, BUFFER_LEN)
+			kvs.conns_chans = append(kvs.conns_chans, newChan)
+			// inline function for goroutines
+			go func(new_chan chan string, conn net.Conn){
+				fmt.Fprintf(conn, <- new_chan)
+			}(newChan, conn)
+			kvs.conns_num++
+			//fmt.Printf("Connected to socket %d\n", conn)
+			//fmt.Printf("In total there are %d connections\n", kvs.conns_num)
+			go handleRequest(conn, kvs)
+		}
+		defer l.Close()
+	}(l)
 
-	defer l.Close()
 	return nil
 }
 
 
 // a goroutine that will handle put requests from clients
 func handleKvsAccess(writeChan chan string, kvs *keyValueServer){
-	fmt.Printf("Start handling put request\n")
+	//fmt.Printf("Start handling put request\n")
 
 	for{
 		cmd := <- writeChan
 		tokens := strings.Split(cmd, ",")
-		fmt.Printf("Serving %v\n", cmd)
+		//fmt.Printf("Serving %v\n", cmd)
 		switch strings.ToLower(strings.Trim(tokens[0], " ")){
 		case "get": handleGetAccess(tokens, kvs)
 		case "put": handlePutAccess(tokens, kvs)
 		default:
-			fmt.Printf("Invalid operation %v\n", cmd)
+			//fmt.Printf("Invalid operation %v\n", cmd)
 		}
-		fmt.Printf("Finished serving %v\n", cmd)
+		//fmt.Printf("Finished serving %v\n", cmd)
 
 	}
 }
 
 // reply clients with query results. Buffered io?
 func handleGetAccess(tokens []string, kvs *keyValueServer){
-	fmt.Printf("Processed get cmd %v %v\n", strings.Trim(tokens[0], " "),
+	/*fmt.Printf("Processed get cmd %v %v\n", strings.Trim(tokens[0], " "),
 		strings.Trim(tokens[1], " "))
+	*/
 	res := string(kvs.kvstore.get(strings.Trim(tokens[1], " ")))
 	for i := 0; i < kvs.conns_num; i++ {
 		dataChan := kvs.conns_chans[i]
@@ -116,7 +119,10 @@ func handleGetAccess(tokens []string, kvs *keyValueServer){
 
 // process data storing operation from client
 func handlePutAccess(tokens []string, kvs *keyValueServer){
-	fmt.Printf("Processed put cmd %v %v %v\n", tokens[0], tokens[1], tokens[2])
+	/*
+	fmt.Printf("Processed put cmd %v %v %v\n", tokens[0], tokens[1],
+		tokens[2])
+	*/
 	kvs.kvstore.put(strings.Trim(tokens[1], " "),
 		[]byte(strings.Trim(tokens[2], " ")))
 }
@@ -138,13 +144,17 @@ func handleRequest(conn net.Conn, kvs *keyValueServer) {
 		text, err := reader.ReadString('\n')
 		if err != nil{
 			// break from the connection upon error
+			/*
 			fmt.Printf("encountered an error %v when reading from connection" +
 				"\n", err)
+			*/
 			kvs.conns_num--
 			break
 		}
+		/*
 		fmt.Printf("Received command %v from connection %d\n", text[:len(text)- 1],
 			conn)
+		*/
 		tokens:= strings.Split(text, ",")
 		switch strings.ToLower(strings.TrimRight(tokens[0], " ")){
 		case "get": doGet(text, conn, kvs)
@@ -165,7 +175,7 @@ key, value
 
 */
 func doGet(cmd string, conn net.Conn, kvs *keyValueServer){
-	fmt.Printf("Processing a get request %v\n", cmd)
+	//fmt.Printf("Processing a get request %v\n", cmd)
 	kvs.dataChan <- cmd[:len(cmd) - 1]
 }
 
@@ -179,6 +189,6 @@ No response should be sent to any of the clients for a put request
 
 */
 func doPut(cmd string, conn net.Conn, kvs *keyValueServer){
-	fmt.Printf("Processing a put request: %v\n", cmd)
+	//fmt.Printf("Processing a put request: %v\n", cmd)
 	kvs.dataChan <- cmd[:len(cmd) - 1]
 }
