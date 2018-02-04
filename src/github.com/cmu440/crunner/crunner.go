@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"os"
 	"bufio"
+	"strings"
 )
 
 const (
@@ -30,7 +31,10 @@ func main() {
     	text, _ := reader.ReadString('\n')
     	fmt.Printf("Sending to server\n")
 		fmt.Fprintf(conn, text + "\n")
-		message, _ := bufio.NewReader(conn).ReadString('\n')
-		fmt.Printf("Message received from server: %v\n", message)
+
+		if (strings.Contains(text,"get")){
+			message, _ := bufio.NewReader(conn).ReadString('\n')
+			fmt.Printf("Message received from server: %v\n", message)
+		}
 	}
 }

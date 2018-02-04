@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"bufio"
-	"bytes"
 )
 
 
@@ -59,7 +58,7 @@ func (kvs *keyValueServer) Start(port int) error {
 	fmt.Println("Creating socket on port: ", port)
 	l, _:= net.Listen(CONN_TYPE, CONN_HOST + ":" + strconv.Itoa(port))
 	fmt.Println("Listening on " + CONN_HOST  + ":" + strconv.Itoa(port))
-	go handlePutReq(kvs.dataChan, kvs.kvstore)
+	go handleKvsAccess(kvs.dataChan, kvs)
 	for { // Listen for an incoming connection
 		conn, _ := l.Accept()
 		kvs.conns = append(kvs.conns, conn)
@@ -74,14 +73,38 @@ func (kvs *keyValueServer) Start(port int) error {
 }
 
 // a goroutine that will handle put requests from clients
-func handlePutReq(writeChan chan string, kvstore KVStore){
+func handleKvsAccess(writeChan chan string, kvs *keyValueServer){
 	fmt.Printf("Start handling put request\n")
+
 	for{
 		cmd := <- writeChan
 		tokens := strings.Split(cmd, ",")
-		kvstore.put(tokens[1], []byte(tokens[2]))
-		fmt.Printf("Wrote %v to kvstore\n", cmd)
+		fmt.Printf("Serving %v\n", cmd)
+		switch strings.ToLower(strings.Trim(tokens[0], " ")){
+		case "get": handleGetAccess(tokens, kvs)
+		case "put": handlePutAccess(tokens, kvs)
+		default:
+			fmt.Printf("Invalid operation %v\n", cmd)
+		}
+		fmt.Printf("Finished serving %v\n", cmd)
+
 	}
+}
+
+func handleGetAccess(tokens []string, kvs *keyValueServer){
+	fmt.Printf("Processed get cmd %v %v\n", strings.Trim(tokens[0], " "),
+		strings.Trim(tokens[1], " "))
+	res := string(kvs.kvstore.get(strings.Trim(tokens[1], " ")))
+	for i := 0; i < kvs.conns_num; i++ {
+		conn := kvs.conns[i]
+		fmt.Fprintf(conn, "%v,%v\n", strings.Trim(tokens[1], " "), res)
+	}
+}
+
+func handlePutAccess(tokens []string, kvs *keyValueServer){
+	fmt.Printf("Processed put cmd %v %v %v\n", tokens[0], tokens[1], tokens[2])
+	kvs.kvstore.put(strings.Trim(tokens[1], " "),
+		[]byte(strings.Trim(tokens[2], " ")))
 }
 
 
@@ -105,14 +128,23 @@ channels and Go's channel-based select statement The server must implement a
 Count() function that returns the # of connected clients
 */
 func handleRequest(conn net.Conn, kvs *keyValueServer) {
-	reader := bufio.NewReader(conn)
-	text, _ := reader.ReadString('\n')
-	fmt.Printf("Received command %v from connection %d\n", text, conn)
-	tokens:= strings.Split(text, ",")
-	switch strings.ToLower(strings.TrimRight(tokens[0], " ")){
-	case "get": doGet(text, conn, kvs)
-	case "put": doPut(text, conn, kvs)
-	default:
+	for{
+		reader := bufio.NewReader(conn)
+		text, err := reader.ReadString('\n')
+		if err != nil{
+			// break from the connection upon error
+			fmt.Printf("encountered an error %v when reading from connection" +
+				"\n", err)
+			break;
+		}
+		fmt.Printf("Received command %v from connection %d\n", text[:len(text)- 1],
+			conn)
+		tokens:= strings.Split(text, ",")
+		switch strings.ToLower(strings.TrimRight(tokens[0], " ")){
+		case "get": doGet(text, conn, kvs)
+		case "put": doPut(text, conn, kvs)
+		default:
+		}
 	}
 }
 
@@ -128,7 +160,7 @@ key, value
 */
 func doGet(cmd string, conn net.Conn, kvs *keyValueServer){
 	fmt.Printf("Processing a get request %v\n", cmd)
-	//todo: come up with a way to pass the connection to channel
+	kvs.dataChan <- cmd[:len(cmd) - 1]
 }
 
 /*
@@ -142,5 +174,5 @@ No response should be sent to any of the clients for a put request
 */
 func doPut(cmd string, conn net.Conn, kvs *keyValueServer){
 	fmt.Printf("Processing a put request: %v\n", cmd)
-	kvs.dataChan <- cmd
+	kvs.dataChan <- cmd[:len(cmd) - 1]
 }
