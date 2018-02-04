@@ -361,6 +361,7 @@ func testBasic(t *testing.T, name string, numClients, numMessages, timeout int) 
         return
     }
 
+    fmt.Printf("Creating testing clients\n")
     allClients := newTestClients(numClients, false)
     if err := ts.startClients(allClients...); err != nil {
         t.Errorf("Failed to start clients: %s\n", err)

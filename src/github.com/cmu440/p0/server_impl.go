@@ -20,6 +20,7 @@ type keyValueServer struct {
 	conns []net.Conn
 	/* channel put request will go to */
 	dataChan chan string
+	conns_chans []chan string
 }
 
 const (
@@ -27,6 +28,7 @@ const (
 	CONN_TYPE = "tcp"
 	BUFFER_SIZE = 1024
 	MAX_CONNS = 100
+	BUFFER_LEN = 500
 )
 
 
@@ -49,6 +51,7 @@ func New() *keyValueServer{
 	/* []net.Conn is a different type from [2]net.Conn */
 	kvServer.conns = make([]net.Conn, 0)
 	kvServer.dataChan = make(chan string)
+	kvServer.conns_chans = make([]chan string, 0)
 	return kvServer
 }
 
@@ -59,18 +62,26 @@ func (kvs *keyValueServer) Start(port int) error {
 	l, _:= net.Listen(CONN_TYPE, CONN_HOST + ":" + strconv.Itoa(port))
 	fmt.Println("Listening on " + CONN_HOST  + ":" + strconv.Itoa(port))
 	go handleKvsAccess(kvs.dataChan, kvs)
+	//todo: here is not allowed to be blocking
 	for { // Listen for an incoming connection
 		conn, _ := l.Accept()
 		kvs.conns = append(kvs.conns, conn)
+		newChan := make(chan string, BUFFER_LEN)
+		kvs.conns_chans = append(kvs.conns_chans, newChan)
+		// inline function for goroutines
+		go func(new_chan chan string, conn net.Conn){
+			fmt.Fprintf(conn, <- new_chan)
+		}(newChan, conn)
 		kvs.conns_num++
 		fmt.Printf("Connected to socket %d\n", conn)
+		fmt.Printf("In total there are %d connections\n", kvs.conns_num)
 		go handleRequest(conn, kvs)
 	}
 
-	fmt.Printf("Closing the server\n")
 	defer l.Close()
 	return nil
 }
+
 
 // a goroutine that will handle put requests from clients
 func handleKvsAccess(writeChan chan string, kvs *keyValueServer){
@@ -91,16 +102,19 @@ func handleKvsAccess(writeChan chan string, kvs *keyValueServer){
 	}
 }
 
+// reply clients with query results. Buffered io?
 func handleGetAccess(tokens []string, kvs *keyValueServer){
 	fmt.Printf("Processed get cmd %v %v\n", strings.Trim(tokens[0], " "),
 		strings.Trim(tokens[1], " "))
 	res := string(kvs.kvstore.get(strings.Trim(tokens[1], " ")))
 	for i := 0; i < kvs.conns_num; i++ {
-		conn := kvs.conns[i]
-		fmt.Fprintf(conn, "%v,%v\n", strings.Trim(tokens[1], " "), res)
+		dataChan := kvs.conns_chans[i]
+		reply := fmt.Sprintf("%v,%v\n", strings.Trim(tokens[1], " "), res)
+		dataChan <- reply
 	}
 }
 
+// process data storing operation from client
 func handlePutAccess(tokens []string, kvs *keyValueServer){
 	fmt.Printf("Processed put cmd %v %v %v\n", tokens[0], tokens[1], tokens[2])
 	kvs.kvstore.put(strings.Trim(tokens[1], " "),
@@ -112,21 +126,12 @@ func (kvs *keyValueServer) Close() {
 	// TODO: release the kv store; how to terminate all goroutines?
 }
 
+// return the number of connected clients
 func (kvs *keyValueServer) Count() int {
-	// TODO: return the # of connected clients
-	return -1
+	return kvs.conns_num
 }
 
-/*
-The server should not assume that the key-value API function listed are
-thread-safe. You will be responsible for ensuring that there are no race
-conditions while accessing the database? How to guard critical region with
-goroutine? If this is known,then problem solved
 
-All synchronization must be done using goroutines,
-channels and Go's channel-based select statement The server must implement a
-Count() function that returns the # of connected clients
-*/
 func handleRequest(conn net.Conn, kvs *keyValueServer) {
 	for{
 		reader := bufio.NewReader(conn)
@@ -135,7 +140,8 @@ func handleRequest(conn net.Conn, kvs *keyValueServer) {
 			// break from the connection upon error
 			fmt.Printf("encountered an error %v when reading from connection" +
 				"\n", err)
-			break;
+			kvs.conns_num--
+			break
 		}
 		fmt.Printf("Received command %v from connection %d\n", text[:len(text)- 1],
 			conn)

@@ -29,12 +29,15 @@ func main() {
     	reader := bufio.NewReader(os.Stdin)
     	fmt.Printf("Text to send: ")
     	text, _ := reader.ReadString('\n')
+    	//todo: ideally read is non-blocking
     	fmt.Printf("Sending to server\n")
 		fmt.Fprintf(conn, text + "\n")
 
-		if (strings.Contains(text,"get")){
+		if strings.Contains(text,"get") {
+			// only log for get request
 			message, _ := bufio.NewReader(conn).ReadString('\n')
 			fmt.Printf("Message received from server: %v\n", message)
 		}
 	}
 }
+
