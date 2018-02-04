@@ -2,6 +2,8 @@
 
 package p0
 
+import "fmt"
+
 /*
 Go doesn't have the concept of class, use struct instead
 access modifier: there is public/private/protected keyword. use*/
@@ -18,8 +20,18 @@ type KVStore struct{
 
 
 // this function instantiates the database
+// if the initial is small case, then access is package level
 func (kvstore *KVStore) init_db() {
-	/* []byte is a byte array which is type as well*/
+	/*
+		difference between make and new?
+		1. make(T) always return type T; new(T) returns type *T
+		2. new works for all types,
+	and dynamically allocates space for a variable of that type,
+	initialized to the zero value of that type, and returns a pointer to it;
+		 make works as a kind of "constructor" for certain bult-in types(
+	slice, map, channel)
+	*/
+	fmt.Println("initializing kvstore")
 	kvstore.kvstore = make(map[string][]byte)
 }
 

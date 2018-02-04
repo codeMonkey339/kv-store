@@ -7,6 +7,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"bufio"
 )
 
 
@@ -24,12 +25,22 @@ const (
 )
 
 
-// create and initialize a new kv server
+/**
+	create and initialize a new kv server
+
+	the function New is a go convention for packages that create a core type
+or different types for use by the application developer
+
+	different between new (Thing) and &Thing{}:
+	&Thing{} works only for Thing being a struct type, map type,
+array type or slice type;
+	new(Thing) works for Thing of any type
+ */
 func New() *keyValueServer{
-	kvServer := &keyValueServer{
-		conns: 0,
-	}
+	fmt.Println("Allocating a new keyValueServer")
+	kvServer := new (keyValueServer)
 	kvServer.kvstore.init_db()
+	kvServer.conns = 0
 	return kvServer
 }
 
@@ -42,8 +53,6 @@ func (kvs *keyValueServer) Start(port int) error {
 		fmt.Println("Error listening:", err.Error())
 		return err
 	}
-	/* when existing from this function, close the port */
-	defer l.Close()
 	fmt.Println("Listening on " + CONN_HOST  + ":" + strconv.Itoa(port))
 	for { // Listen for an incoming connection
 		conn, err := l.Accept()
@@ -52,8 +61,14 @@ func (kvs *keyValueServer) Start(port int) error {
 			/* Go has the continue keyword */
 			continue
 		}
+		fmt.Printf("Connected to socket %d\n", conn)
+		/* Start is a class method, now it calls a non-class method.
+		How does it work? */
 		go handleRequest(conn)
 	}
+
+	/* when existing from this function, close the port */
+	defer l.Close()
 	return nil
 }
 
@@ -68,29 +83,23 @@ func (kvs *keyValueServer) Count() int {
 }
 
 /*
-The server should not assume that the key-value API function listed are thread-safe.
-You will be responsible for ensuring that there are no race conditions while accessing the database?
+The server should not assume that the key-value API function listed are
+thread-safe. You will be responsible for ensuring that there are no race
+conditions while accessing the database? How to guard critical region with
+goroutine? If this is known,then problem solved
 
-How to guard critical region with goroutine? If this knows, then problem solved
-
-All synchronization must be done using goroutines, channels and Go's channel-based select statement
-
-The server must implement a Count() function that returns the # of connected clients
+All synchronization must be done using goroutines,
+channels and Go's channel-based select statement The server must implement a
+Count() function that returns the # of connected clients
 */
 func handleRequest(conn net.Conn) {
-	buf := make([]byte, BUFFER_SIZE)
-	reqLen, err := conn.Read(buf)
-	if err != nil {
-		fmt.Println("Error reading:", err.Error())
-		return
-	}
-	fmt.Println(conn)
-	fmt.Println("Reading len: ", reqLen)
-	/* todo: need to parse request and send back response */
-	tokens:= strings.Split(string(buf[:]), ",")
+	reader := bufio.NewReader(conn)
+	text, _ := reader.ReadString('\n')
+	fmt.Printf("Received command %v from connection %d\n", text, conn)
+	tokens:= strings.Split(text, ",")
 	switch strings.ToLower(strings.TrimRight(tokens[0], " ")){
-	case "get": doGet()
-	case "put": doPut()
+	case "get": doGet(tokens, conn)
+	case "put": doPut(tokens, conn)
 	default:
 	}
 }
@@ -105,8 +114,10 @@ response format of GET:
 key, value
 
 */
-func doGet(){
-
+func doGet(tokens []string, conn net.Conn){
+	//todo: complete the logic here
+	fmt.Printf("Processing a get request %v, %v\n", tokens[0],tokens[1])
+	fmt.Fprintf(conn, "Received command %v, %v\n", tokens[0], tokens[1])
 }
 
 /*
@@ -118,6 +129,8 @@ get, key
 No reponse should be sent to any of the clients for a put request
 
 */
-func doPut(){
-
+func doPut(tokens []string, conn net.Conn){
+	//todo: complete the logic here
+	fmt.Printf("Processing a put request %v, %v, %v\n", tokens[0],
+		tokens[1], tokens[2])
 }

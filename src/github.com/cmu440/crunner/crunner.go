@@ -2,11 +2,16 @@ package main
 
 import (
     "fmt"
+	"net"
+	"strconv"
+	"os"
+	"bufio"
 )
 
 const (
     defaultHost = "localhost"
     defaultPort = 9999
+    defaultProtocol = "tcp"
 )
 
 // To test your server implementation, you might find it helpful to implement a
@@ -15,5 +20,17 @@ const (
 // read and print out the server's response to standard output. Whether or
 // not you add any code to this file will not affect your grade.
 func main() {
-    fmt.Println("Not implemented.")
+    fmt.Printf("Creating a test Client\n")
+    conn, _:= net.Dial(defaultProtocol, defaultHost + ":" + strconv.Itoa(
+    	defaultPort))
+
+    for{
+    	reader := bufio.NewReader(os.Stdin)
+    	fmt.Printf("Text to send: ")
+    	text, _ := reader.ReadString('\n')
+    	fmt.Printf("Sending to server\n")
+		fmt.Fprintf(conn, text + "\n")
+		message, _ := bufio.NewReader(conn).ReadString('\n')
+		fmt.Printf("Message received from server: %v\n", message)
+	}
 }
