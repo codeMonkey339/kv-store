@@ -8,20 +8,26 @@ import (
 	"strconv"
 	"strings"
 	"bufio"
+	"bytes"
 )
 
 
 type keyValueServer struct {
 	/* the # of connections */
-	conns int
+	conns_num int
 	/* the kv store to actually store data */
 	kvstore KVStore
+	/* currently active connections */
+	conns []net.Conn
+	/* channel put request will go to */
+	dataChan chan string
 }
 
 const (
 	CONN_HOST = "localhost"
 	CONN_TYPE = "tcp"
 	BUFFER_SIZE = 1024
+	MAX_CONNS = 100
 )
 
 
@@ -40,36 +46,42 @@ func New() *keyValueServer{
 	fmt.Println("Allocating a new keyValueServer")
 	kvServer := new (keyValueServer)
 	kvServer.kvstore.init_db()
-	kvServer.conns = 0
+	kvServer.conns_num = 0
+	/* []net.Conn is a different type from [2]net.Conn */
+	kvServer.conns = make([]net.Conn, 0)
+	kvServer.dataChan = make(chan string)
 	return kvServer
 }
 
 // method on the keyValueServer to start the server with the given port #
+/* able to use instance symbols with kvs */
 func (kvs *keyValueServer) Start(port int) error {
 	fmt.Println("Creating socket on port: ", port)
-	l, err := net.Listen(CONN_TYPE, CONN_HOST + ":" + strconv.Itoa(port))
-	if err != nil {
-		/* log network error to stdio*/
-		fmt.Println("Error listening:", err.Error())
-		return err
-	}
+	l, _:= net.Listen(CONN_TYPE, CONN_HOST + ":" + strconv.Itoa(port))
 	fmt.Println("Listening on " + CONN_HOST  + ":" + strconv.Itoa(port))
+	go handlePutReq(kvs.dataChan, kvs.kvstore)
 	for { // Listen for an incoming connection
-		conn, err := l.Accept()
-		if err != nil {
-			fmt.Println("Error accepting: ", err.Error())
-			/* Go has the continue keyword */
-			continue
-		}
+		conn, _ := l.Accept()
+		kvs.conns = append(kvs.conns, conn)
+		kvs.conns_num++
 		fmt.Printf("Connected to socket %d\n", conn)
-		/* Start is a class method, now it calls a non-class method.
-		How does it work? */
-		go handleRequest(conn)
+		go handleRequest(conn, kvs)
 	}
 
-	/* when existing from this function, close the port */
+	fmt.Printf("Closing the server\n")
 	defer l.Close()
 	return nil
+}
+
+// a goroutine that will handle put requests from clients
+func handlePutReq(writeChan chan string, kvstore KVStore){
+	fmt.Printf("Start handling put request\n")
+	for{
+		cmd := <- writeChan
+		tokens := strings.Split(cmd, ",")
+		kvstore.put(tokens[1], []byte(tokens[2]))
+		fmt.Printf("Wrote %v to kvstore\n", cmd)
+	}
 }
 
 
@@ -92,14 +104,14 @@ All synchronization must be done using goroutines,
 channels and Go's channel-based select statement The server must implement a
 Count() function that returns the # of connected clients
 */
-func handleRequest(conn net.Conn) {
+func handleRequest(conn net.Conn, kvs *keyValueServer) {
 	reader := bufio.NewReader(conn)
 	text, _ := reader.ReadString('\n')
 	fmt.Printf("Received command %v from connection %d\n", text, conn)
 	tokens:= strings.Split(text, ",")
 	switch strings.ToLower(strings.TrimRight(tokens[0], " ")){
-	case "get": doGet(tokens, conn)
-	case "put": doPut(tokens, conn)
+	case "get": doGet(text, conn, kvs)
+	case "put": doPut(text, conn, kvs)
 	default:
 	}
 }
@@ -114,10 +126,9 @@ response format of GET:
 key, value
 
 */
-func doGet(tokens []string, conn net.Conn){
-	//todo: complete the logic here
-	fmt.Printf("Processing a get request %v, %v\n", tokens[0],tokens[1])
-	fmt.Fprintf(conn, "Received command %v, %v\n", tokens[0], tokens[1])
+func doGet(cmd string, conn net.Conn, kvs *keyValueServer){
+	fmt.Printf("Processing a get request %v\n", cmd)
+	//todo: come up with a way to pass the connection to channel
 }
 
 /*
@@ -126,11 +137,10 @@ work horse for the PUT request
 PUT request format:
 get, key
 
-No reponse should be sent to any of the clients for a put request
+No response should be sent to any of the clients for a put request
 
 */
-func doPut(tokens []string, conn net.Conn){
-	//todo: complete the logic here
-	fmt.Printf("Processing a put request %v, %v, %v\n", tokens[0],
-		tokens[1], tokens[2])
+func doPut(cmd string, conn net.Conn, kvs *keyValueServer){
+	fmt.Printf("Processing a put request: %v\n", cmd)
+	kvs.dataChan <- cmd
 }
